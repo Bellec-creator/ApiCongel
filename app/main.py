@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -8,11 +9,18 @@ from app.config import settings
 from app.database import Base, engine
 from app.routers import produits
 
+logger = logging.getLogger("congel")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Crée les tables au démarrage (pratique en dev ; en prod, préférer Alembic).
-    Base.metadata.create_all(bind=engine)
+    # On n'empêche pas le démarrage si la base est momentanément injoignable :
+    # l'app reste disponible (ex: /health) et les erreurs DB remontent par requête.
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception:
+        logger.exception("create_all a échoué au démarrage (base injoignable ?)")
     yield
 
 
